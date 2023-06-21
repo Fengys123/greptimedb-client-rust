@@ -19,6 +19,7 @@ mod database;
 mod error;
 pub mod load_balance;
 mod stream_insert;
+pub mod batch_stream;
 
 pub use self::client::Client;
 pub use self::database::Database;

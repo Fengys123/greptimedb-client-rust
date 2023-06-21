@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::Duration;
+
 use crate::api::v1::auth_header::AuthScheme;
 use crate::api::v1::greptime_request::Request;
 use crate::api::v1::{
     greptime_response, AffectedRows, AuthHeader, DeleteRequest, GreptimeRequest, InsertRequest,
     InsertRequests, RequestHeader,
 };
-use crate::stream_insert::StreamInserter;
+use crate::stream_insert::{BatchOption, StreamInserter};
 
 use snafu::OptionExt;
 
@@ -70,13 +72,23 @@ impl Database {
             .await
     }
 
+
     pub fn streaming_inserter(&self) -> Result<StreamInserter> {
-        self.streaming_inserter_with_channel_size(1024)
+        self.streaming_inserter_with_config(1024, None)
     }
 
-    pub fn streaming_inserter_with_channel_size(
+    pub fn stream_insert_with_batch_opt(
+        &self,
+        delay: Option<Duration>,
+        batch_size: Option<u32>,
+    ) -> Result<StreamInserter> {
+        self.streaming_inserter_with_config(1024, Some(BatchOption { delay, batch_size }))
+    }
+
+    pub fn streaming_inserter_with_config(
         &self,
         channel_size: usize,
+        batch_opt: Option<BatchOption>,
     ) -> Result<StreamInserter> {
         let client = self.client.make_database_client()?.inner;
 
@@ -85,6 +97,7 @@ impl Database {
             self.dbname().to_string(),
             self.auth_header.clone(),
             channel_size,
+            batch_opt,
         );
 
         Ok(stream_inserter)

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::Duration;
+
 use greptime_proto::v1::greptime_request::Request;
 use greptime_proto::v1::{greptime_database_client::GreptimeDatabaseClient, InsertRequest};
 use greptime_proto::v1::{
@@ -51,18 +53,25 @@ pub struct StreamInserter {
     join: JoinHandle<std::result::Result<Response<GreptimeResponse>, Status>>,
 }
 
+pub struct BatchOption {
+    pub delay: Option<Duration>,
+    pub batch_size: Option<u32>,
+}
+
 impl StreamInserter {
     pub(crate) fn new(
         mut client: GreptimeDatabaseClient<Channel>,
         dbname: String,
         auth_header: Option<AuthHeader>,
         channel_size: usize,
+        _batch_opt: Option<BatchOption>,
     ) -> StreamInserter {
         let (send, recv) = tokio::sync::mpsc::channel(channel_size);
 
         let join: JoinHandle<std::result::Result<Response<GreptimeResponse>, Status>> =
             tokio::spawn(async move {
                 let recv_stream = ReceiverStream::new(recv);
+                // batch handle
                 client.handle_requests(recv_stream).await
             });
 
