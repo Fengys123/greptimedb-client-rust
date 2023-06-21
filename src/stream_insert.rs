@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::time::Duration;
-
 use greptime_proto::v1::greptime_request::Request;
 use greptime_proto::v1::{greptime_database_client::GreptimeDatabaseClient, InsertRequest};
 use greptime_proto::v1::{
@@ -27,6 +25,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::Channel;
 use tonic::{Response, Status};
 
+use crate::batch_stream::{BatchOption, BatchStream};
 use crate::error::Result;
 use crate::error::{self, IllegalDatabaseResponseSnafu};
 
@@ -53,26 +52,26 @@ pub struct StreamInserter {
     join: JoinHandle<std::result::Result<Response<GreptimeResponse>, Status>>,
 }
 
-pub struct BatchOption {
-    pub delay: Option<Duration>,
-    pub batch_size: Option<u32>,
-}
-
 impl StreamInserter {
     pub(crate) fn new(
         mut client: GreptimeDatabaseClient<Channel>,
         dbname: String,
         auth_header: Option<AuthHeader>,
         channel_size: usize,
-        _batch_opt: Option<BatchOption>,
+        batch_opt: Option<BatchOption>,
     ) -> StreamInserter {
         let (send, recv) = tokio::sync::mpsc::channel(channel_size);
 
         let join: JoinHandle<std::result::Result<Response<GreptimeResponse>, Status>> =
             tokio::spawn(async move {
                 let recv_stream = ReceiverStream::new(recv);
-                // batch handle
-                client.handle_requests(recv_stream).await
+
+                if let Some(batch_opt) = batch_opt {
+                    let batch_stream = BatchStream::new(recv_stream, batch_opt);
+                    client.handle_requests(batch_stream).await
+                } else {
+                    client.handle_requests(recv_stream).await
+                }
             });
 
         StreamInserter {

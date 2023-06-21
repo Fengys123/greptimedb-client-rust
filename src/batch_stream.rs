@@ -12,17 +12,19 @@ pub struct BatchStream<T> {
     #[pin]
     inner: T,
 
-    delay: Option<Duration>,
+    batch_opt: BatchOption,
+}
 
-    batch_size: Option<u32>,
+pub struct BatchOption {
+    pub delay: Option<Duration>,
+    pub batch_size: Option<u32>,
 }
 
 impl<T> BatchStream<T> {
-    pub fn new(stream: T, delay: Option<Duration>, batch_size: Option<u32>) -> Self {
+    pub fn new(stream: T, batch_opt: BatchOption) -> Self {
         Self {
             inner: stream,
-            delay,
-            batch_size,
+            batch_opt,
         }
     }
 }
@@ -31,15 +33,11 @@ impl<T> Stream for BatchStream<T>
 where
     T: Stream<Item = GreptimeRequest>,
 {
-    type Item = Vec<GreptimeRequest>;
+    type Item = GreptimeRequest;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
-        let inner = this.inner;
 
-        match inner.poll_next(cx) {
-            Poll::Ready(req) => Poll::Ready(req.map(|req| vec![req])),
-            Poll::Pending => Poll::Pending,
-        }
+        this.inner.poll_next(cx)
     }
 }

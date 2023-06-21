@@ -20,7 +20,8 @@ use crate::api::v1::{
     greptime_response, AffectedRows, AuthHeader, DeleteRequest, GreptimeRequest, InsertRequest,
     InsertRequests, RequestHeader,
 };
-use crate::stream_insert::{BatchOption, StreamInserter};
+use crate::batch_stream::BatchOption;
+use crate::stream_insert::StreamInserter;
 
 use snafu::OptionExt;
 
@@ -71,7 +72,6 @@ impl Database {
         self.handle(Request::Inserts(InsertRequests { inserts: requests }))
             .await
     }
-
 
     pub fn streaming_inserter(&self) -> Result<StreamInserter> {
         self.streaming_inserter_with_config(1024, None)
